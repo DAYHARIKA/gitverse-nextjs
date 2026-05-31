@@ -62,7 +62,10 @@ export function RecentReposList() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const userRepos = response.data.repositories || [];
+      const resData = response.data.data?.repositories || response.data.repositories || {};
+      const userRepos = Array.isArray(resData)
+        ? resData
+        : (Array.isArray(resData.data) ? resData.data : []);
       const existingRepo = userRepos.find(
         (r: any) => r.url.toLowerCase().trim() === repo.url.toLowerCase().trim()
       );
@@ -89,7 +92,10 @@ export function RecentReposList() {
           }
         );
 
-        const newRepo = createResponse.data.repository;
+        const newRepo = createResponse.data.data?.repository || createResponse.data.repository;
+        if (!newRepo?.id) {
+          throw new Error("Repository object not found in create response");
+        }
         router.push(`/repo/${newRepo.id}`);
       }
     } catch (error: any) {

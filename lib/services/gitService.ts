@@ -711,7 +711,7 @@ export class GitService {
   /**
    * Detect language from file extension
    */
-  private detectLanguageFromExtension(extension: string | null): string | null {
+  public static detectLanguageFromExtension(extension: string | null): string | null {
     if (!extension) return null;
 
     const ext = extension.toLowerCase().replace(".", "");
@@ -847,7 +847,7 @@ export class GitService {
               }
 
               // Detect language from extension
-              const language = this.detectLanguageFromExtension(extension);
+              const language = GitService.detectLanguageFromExtension(extension);
 
               files.push({
                 path: filePath,
@@ -923,6 +923,41 @@ export class GitService {
       return parseInt(stdout.trim().split("\t")[0]);
     } catch (error: any) {
       return 0;
+    }
+  }
+
+  /**
+   * Checkout a specific commit, branch, or tag
+   */
+  async checkout(ref: string): Promise<void> {
+    try {
+      await this.spawnGit(["checkout", ref], { timeout: DEFAULT_GIT_TIMEOUT_MS });
+    } catch (error: any) {
+      throw new Error(`Failed to checkout ref ${ref}: ${error.message}`);
+    }
+  }
+
+  /**
+   * Get all tags and their associated commit hashes
+   */
+  async getTags(): Promise<{ name: string; commitHash: string }[]> {
+    try {
+      const { stdout } = await this.spawnGit(
+        ["show-ref", "--tags"],
+        { timeout: DEFAULT_GIT_TIMEOUT_MS }
+      );
+      return stdout
+        .trim()
+        .split("\n")
+        .filter(Boolean)
+        .map((line) => {
+          const [commitHash, ref] = line.split(" ");
+          const name = ref.replace(/^refs\/tags\//, "");
+          return { name, commitHash };
+        });
+    } catch {
+      // It will throw if there are no tags, which is fine, return empty list
+      return [];
     }
   }
 

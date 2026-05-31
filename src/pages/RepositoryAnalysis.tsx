@@ -12,6 +12,7 @@ import { Contributors } from "@/components/repository/Contributors";
 import { RepositoryInsights } from "@/components/repository/RepositoryInsights";
 import { RepositoryMentorTab } from "@/components/ai/RepositoryMentorTab";
 import { AIRepositoryOverlay } from "@/components/ai/AIRepositoryOverlay";
+import { RepositoryEvolutionDashboard } from "@/components/repository/RepositoryEvolutionDashboard";
 
 import {
   Home,
@@ -41,7 +42,8 @@ type TabType =
   | "commits"
   | "contributors"
   | "mentor"
-  | "insights";
+  | "insights"
+  | "evolution";
 
 interface Tab {
   id: TabType;
@@ -67,6 +69,11 @@ const tabs: Tab[] = [
     id: "insights",
     label: "Insights",
     icon: <BarChart3 className="h-4 w-4" />,
+  },
+  {
+    id: "evolution",
+    label: "Evolution",
+    icon: <Activity className="h-4 w-4" />,
   },
 ];
 
@@ -145,10 +152,12 @@ export default function RepositoryAnalysis() {
     const jobStatus = job?.status as string | undefined;
 
     const shouldShowAnalyzing =
-      repoStatus === "pending" ||
-      repoStatus === "analyzing" ||
-      jobStatus === "QUEUED" ||
-      jobStatus === "PROCESSING";
+      repoStatus !== "completed" &&
+      repoStatus !== "failed" &&
+      (repoStatus === "pending" ||
+        repoStatus === "analyzing" ||
+        jobStatus === "QUEUED" ||
+        jobStatus === "PROCESSING");
 
     setIsAnalyzing(Boolean(shouldShowAnalyzing));
 
@@ -330,6 +339,8 @@ export default function RepositoryAnalysis() {
         return <RepositoryMentorTab repositoryData={repository} />;
       case "insights":
         return <RepositoryInsights repository={repository} />;
+      case "evolution":
+        return <RepositoryEvolutionDashboard repository={repository} />;
       default:
         return <RepositoryOverview />;
     }

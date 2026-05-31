@@ -58,9 +58,11 @@ export default function SearchPage() {
       const response = await axios.get(buildApiUrl("/api/repositories"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
-      const repos = response.data.repositories || [];
-      setRepositories(Array.isArray(repos) ? repos : []);
+      const resData = response.data.data?.repositories || response.data.repositories || {};
+      const repos = Array.isArray(resData)
+        ? resData
+        : (Array.isArray(resData.data) ? resData.data : []);
+      setRepositories(repos);
     }  
     catch (error: any) {
   console.error("Error fetching repositories:", error);

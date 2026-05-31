@@ -209,6 +209,7 @@ model Repository {
   securitySandboxes   SecuritySandbox[]
   reviewPolicies      ReviewPolicy[]
   policyAssignment    RepositoryPolicyAssignment?
+  architectureSnapshots ArchitectureSnapshot[]
 
   @@index([url])
   @@index([userId])
@@ -499,6 +500,8 @@ model ReviewPolicy {
 
   @@index([repositoryId])
   @@map("review_policies")
+}
+
 model AiQuota {
   id               String    @id @default(uuid()) @db.Uuid
   installationId   BigInt    @unique @map("installation_id")
@@ -607,4 +610,23 @@ model AuditLog {
   @@index([repositoryId, createdAt(sort: Desc)])
   @@map("audit_logs")
 }
+
+model ArchitectureSnapshot {
+  id            Int        @id @default(autoincrement())
+  repositoryId  Int        @map("repository_id")
+  commitHash    String     @map("commit_hash")
+  tagName       String?    @map("tag_name")
+  commitMessage String     @map("commit_message")
+  committedAt   DateTime   @map("committed_at")
+  dependencyGraph Json     @map("dependency_graph")
+  metadata      Json?      @map("metadata")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  repository Repository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+
+  @@unique([repositoryId, commitHash])
+  @@index([repositoryId])
+  @@map("architecture_snapshots")
+}
+
 

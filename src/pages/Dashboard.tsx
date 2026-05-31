@@ -130,7 +130,11 @@ export default function Dashboard() {
           );
 
           await fetchRepositories();
-          router.push(`/repo/${response.data.repository.id}`);
+          const newRepo = response.data.data?.repository || response.data.repository;
+          if (!newRepo?.id) {
+            throw new Error("Repository object not found in create response");
+          }
+          router.push(`/repo/${newRepo.id}`);
           setRepoUrl("");
         } catch (error: any) {
           console.error("Auto analysis failed:", error);
@@ -154,10 +158,11 @@ export default function Dashboard() {
       const response = await axios.get(buildApiUrl("/api/repositories?limit=1000"), {
         headers: { Authorization: `Bearer ${token}` },
       });
-      // API returns { repositories: [...] }
-      const repos =
-        response.data.data?.repositories || response.data.repositories || [];
-      setRepositories(Array.isArray(repos) ? repos : []);
+      const resData = response.data.data?.repositories || response.data.repositories || {};
+      const repos = Array.isArray(resData)
+        ? resData
+        : (Array.isArray(resData.data) ? resData.data : []);
+      setRepositories(repos);
     } catch (error: any) {
       console.error("Error fetching repositories:", error);
 
@@ -297,7 +302,11 @@ export default function Dashboard() {
 
       await fetchRepositories();
 
-      router.push(`/repo/${response.data.repository.id}`);
+      const newRepo = response.data.data?.repository || response.data.repository;
+      if (!newRepo?.id) {
+        throw new Error("Repository object not found in create response");
+      }
+      router.push(`/repo/${newRepo.id}`);
 
       if (isExisting) {
         console.log("Navigating to existing repository");

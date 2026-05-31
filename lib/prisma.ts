@@ -91,18 +91,18 @@ function createPrismaClient() {
 
   if (adapterChoice === "neon-ws") {
     // 1. WebSocket-based pooled adapter for Neon in serverless environment
-    const pool = new NeonPool({
-      connectionString,
-      connectionTimeoutMillis: normalizedConnectionTimeoutMs,
-      idleTimeoutMillis: process.env.NODE_ENV === "production" ? 30000 : 10000,
-      max: normalizedPoolMax,
-    });
-
-    pool.on("error", (err: any) => {
-      console.error("Unexpected Neon WebSocket pool error:", err);
-    });
-
-    const adapter = new PrismaNeon(pool as any);
+    const adapter = new PrismaNeon(
+      {
+        connectionString,
+        connectionTimeoutMillis: normalizedConnectionTimeoutMs,
+        max: normalizedPoolMax,
+      },
+      {
+        onPoolError: (err: any) => {
+          console.error("Unexpected Neon WebSocket pool error:", err);
+        },
+      }
+    );
     return withRetry(new PrismaClient({
       adapter,
       log: ["error", "warn"],

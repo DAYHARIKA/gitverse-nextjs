@@ -20,6 +20,7 @@ import { GitHubChecksService } from "@/lib/services/github-checks";
 import { PremergePolicyEngine } from "@/lib/services/premerge-policy-engine";
 import { CheckSummaryService } from "@/lib/services/check-summary";
 import { CheckRecoveryService } from "@/lib/services/check-recovery";
+import { webhookQueue } from "@/lib/services/webhook-queue";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 minutes max duration for Vercel
@@ -401,12 +402,6 @@ async function handlePost(request: NextRequest) {
     
     await prisma.webhookEvent.update({
       where: { id: eventId },
-      data: {
-        status: shouldRetry ? "pending" : "failed",
-        error: String(error?.message || error),
-        retryCount: currentRetryCount + 1,
-        nextRetryAt: shouldRetry ? new Date(Date.now() + retryDelay) : null,
-      },
       data: { status: "failed", error: String(error?.message || error) },
     });
 

@@ -77,7 +77,10 @@ export default function CompareRepositories() {
       const response = await axios.get(buildApiUrl("/api/repositories?limit=100"), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const repos = response.data?.repositories || [];
+      const resData = response.data?.data?.repositories || response.data?.repositories || {};
+      const repos = Array.isArray(resData)
+        ? resData
+        : (Array.isArray(resData.data) ? resData.data : []);
       // Filter only analyzed/complete repositories
       setRepoList(repos);
     } catch (error) {

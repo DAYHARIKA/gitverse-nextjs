@@ -209,7 +209,6 @@ export async function reviewPullRequest(params: {
   number: number;
   githubToken?: string;
   repositoryId?: number;
-}): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string }> {
   timeoutEstimator?: TimeoutEstimatorService;
 }): Promise<{ review: PRReviewResponse; prTitle: string; prUrl: string; tokensConsumed?: number }> {
   const github = new GitHubService(params.githubToken);
@@ -248,23 +247,22 @@ export async function reviewPullRequest(params: {
   const processChunk = async (chunkFiles: typeof prFiles, chunkIndex: number, totalChunks: number): Promise<PRReviewResponse | null> => {
     const { diff, stats } = buildDiffForPrompt(chunkFiles);
 
-  // Fetch active organizational policies for this repository
-  let policySection = "";
-  if (params.repositoryId) {
-    try {
-      const policies = await getActivePoliciesForRepository(params.repositoryId);
-      policySection = buildPolicyPromptSection(policies);
-    } catch (error) {
-      console.warn("[reviewPullRequest] Failed to fetch review policies:", error);
-    }
-  }
-
-  const prompt = `You are a senior code reviewer. Review the following GitHub Pull Request changes.
     if (!diff) {
       if (totalChunks === 1) {
         throw new Error("PR diff is unavailable (no patch content returned).");
       }
       return null;
+    }
+
+    // Fetch active organizational policies for this repository
+    let policySection = "";
+    if (params.repositoryId) {
+      try {
+        const policies = await getActivePoliciesForRepository(params.repositoryId);
+        policySection = buildPolicyPromptSection(policies);
+      } catch (error) {
+        console.warn("[reviewPullRequest] Failed to fetch review policies:", error);
+      }
     }
 
     const chunkNotice = totalChunks > 1 ? `(Chunk ${chunkIndex} of ${totalChunks})` : "";

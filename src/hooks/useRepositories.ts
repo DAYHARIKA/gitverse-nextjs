@@ -72,7 +72,10 @@ export function useRepositories({ limit = DEFAULT_LIMIT } = {}): UseRepositories
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const { data, nextCursor, hasMore: newHasMore } = response.data;
+      const resData = response.data.data?.repositories || response.data.repositories || {};
+      const { data, nextCursor, hasMore: newHasMore } = Array.isArray(resData)
+        ? { data: resData, nextCursor: undefined, hasMore: false }
+        : resData;
       
       const newRepos = Array.isArray(data) ? data : [];
 
