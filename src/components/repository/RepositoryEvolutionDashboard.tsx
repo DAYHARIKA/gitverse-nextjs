@@ -30,6 +30,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { motion, AnimatePresence } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 
 interface RepositoryEvolutionDashboardProps {
   repository: any;
@@ -908,27 +909,50 @@ export function RepositoryEvolutionDashboard({
                 </div>
               ) : evolutionData?.aiInsights ? (
                 <div className="prose prose-invert max-w-none text-slate-300 overflow-y-auto max-h-[500px] pr-2 scrollbar-thin">
-                  {/* Clean custom Markdown renderer for the generated report */}
-                  <div className="space-y-4 text-sm leading-relaxed">
-                    {evolutionData.aiInsights.split("\n").map((line: string, i: number) => {
-                      if (line.startsWith("# ")) {
-                        return <h1 key={i} className="text-2xl font-bold text-white mt-6 mb-3">{renderBoldText(line.replace("# ", ""))}</h1>;
-                      }
-                      if (line.startsWith("## ")) {
-                        return <h2 key={i} className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/5 pb-1">{renderBoldText(line.replace("## ", ""))}</h2>;
-                      }
-                      if (line.startsWith("### ")) {
-                        return <h3 key={i} className="text-lg font-bold text-white mt-4 mb-2">{renderBoldText(line.replace("### ", ""))}</h3>;
-                      }
-                      if (line.startsWith("- ") || line.startsWith("* ")) {
-                        return <li key={i} className="ml-4 list-disc text-slate-300 pl-1">{renderBoldText(line.replace(/^[-*]\s+/, ""))}</li>;
-                      }
-                      if (line.trim() === "") {
-                        return <div key={i} className="h-2" />;
-                      }
-                      return <p key={i} className="text-slate-300">{renderBoldText(line)}</p>;
-                    })}
-                  </div>
+                  <ReactMarkdown
+                    components={{
+                      h1: (props) => (
+                        <h1
+                          className="text-2xl font-bold text-white mt-6 mb-3"
+                          {...props}
+                        />
+                      ),
+                      h2: (props) => (
+                        <h2
+                          className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/5 pb-1"
+                          {...props}
+                        />
+                      ),
+                      h3: (props) => (
+                        <h3
+                          className="text-lg font-bold text-white mt-4 mb-2"
+                          {...props}
+                        />
+                      ),
+                      p: (props) => (
+                        <p className="my-3 text-sm leading-relaxed text-slate-300" {...props} />
+                      ),
+                      ul: (props) => (
+                        <ul
+                          className="list-disc pl-6 my-2 space-y-1.5 text-slate-300"
+                          {...props}
+                        />
+                      ),
+                      ol: (props) => (
+                        <ol
+                          className="list-decimal pl-6 my-2 space-y-1.5 text-slate-300"
+                          {...props}
+                        />
+                      ),
+                      li: (props) => <li className="text-sm leading-relaxed" {...props} />,
+                      strong: (props) => <strong className="font-bold text-white" {...props} />,
+                      em: (props) => <em className="italic text-slate-300" {...props} />,
+                      code: (props) => <code className="px-1 py-0.5 rounded bg-black/30 font-mono text-xs text-indigo-300" {...props} />,
+                      pre: (props) => <pre className="p-3 rounded-lg bg-black/30 overflow-auto font-mono text-xs my-3" {...props} />,
+                    }}
+                  >
+                    {evolutionData.aiInsights}
+                  </ReactMarkdown>
                 </div>
               ) : (
                 <div className="py-16 text-center space-y-4 glass bg-slate-950/20 rounded-lg">
