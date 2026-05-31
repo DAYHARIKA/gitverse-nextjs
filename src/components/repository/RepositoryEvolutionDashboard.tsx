@@ -512,6 +512,16 @@ export function RepositoryEvolutionDashboard({
           const deletedFiles = snapAFiles.filter(f => !snapBFiles.includes(f));
           const addedFiles = snapBFiles.filter(f => !snapAFiles.includes(f));
 
+          const metaA = snapA?.metadata || {};
+          const metaB = snapB?.metadata || {};
+          const totalFilesA = metaA.totalFiles || 0;
+          const totalFilesB = metaB.totalFiles || 0;
+          const totalLinesA = metaA.totalLines || 0;
+          const totalLinesB = metaB.totalLines || 0;
+          const totalSizeA = metaA.totalSize || 0;
+          const totalSizeB = metaB.totalSize || 0;
+          const primaryLanguage = metaB.languages?.[0]?.name || "N/A";
+
           return (
             <motion.div
               key="compare"
@@ -650,29 +660,29 @@ export function RepositoryEvolutionDashboard({
                     <div className="p-4 rounded-lg bg-slate-950/20 text-center">
                       <div className="text-xs text-slate-500">File Count Shift</div>
                       <div className="text-lg font-bold mt-1 text-slate-200">
-                        {snapA.metadata.totalFiles} → {snapB.metadata.totalFiles} (
-                        {snapB.metadata.totalFiles - snapA.metadata.totalFiles >= 0 ? "+" : ""}
-                        {snapB.metadata.totalFiles - snapA.metadata.totalFiles})
+                        {totalFilesA} → {totalFilesB} (
+                        {totalFilesB - totalFilesA >= 0 ? "+" : ""}
+                        {totalFilesB - totalFilesA})
                       </div>
                     </div>
                     <div className="p-4 rounded-lg bg-slate-950/20 text-center">
                       <div className="text-xs text-slate-500">Lines Growth</div>
                       <div className="text-lg font-bold mt-1 text-slate-200">
-                        {snapA.metadata.totalLines} → {snapB.metadata.totalLines} (
-                        {snapB.metadata.totalLines - snapA.metadata.totalLines >= 0 ? "+" : ""}
-                        {snapB.metadata.totalLines - snapA.metadata.totalLines})
+                        {totalLinesA} → {totalLinesB} (
+                        {totalLinesB - totalLinesA >= 0 ? "+" : ""}
+                        {totalLinesB - totalLinesA})
                       </div>
                     </div>
                     <div className="p-4 rounded-lg bg-slate-950/20 text-center">
                       <div className="text-xs text-slate-500">Size Change</div>
                       <div className="text-lg font-bold mt-1 text-slate-200">
-                        {Math.round(snapA.metadata.totalSize / 1024)} KB → {Math.round(snapB.metadata.totalSize / 1024)} KB
+                        {Math.round(totalSizeA / 1024)} KB → {Math.round(totalSizeB / 1024)} KB
                       </div>
                     </div>
                     <div className="p-4 rounded-lg bg-slate-950/20 text-center">
                       <div className="text-xs text-slate-500">Primary Language</div>
                       <div className="text-lg font-bold mt-1 text-blue-400">
-                        {snapB.metadata.languages[0]?.name || "N/A"}
+                        {primaryLanguage}
                       </div>
                     </div>
                   </div>
