@@ -35,6 +35,20 @@ interface RepositoryEvolutionDashboardProps {
   repository: any;
 }
 
+function renderBoldText(text: string) {
+  const parts = text.split("**");
+  return parts.map((part, index) => {
+    if (index % 2 === 1) {
+      return (
+        <strong key={index} className="font-bold text-white">
+          {part}
+        </strong>
+      );
+    }
+    return part;
+  });
+}
+
 export function RepositoryEvolutionDashboard({
   repository,
 }: RepositoryEvolutionDashboardProps) {
@@ -898,21 +912,21 @@ export function RepositoryEvolutionDashboard({
                   <div className="space-y-4 text-sm leading-relaxed">
                     {evolutionData.aiInsights.split("\n").map((line: string, i: number) => {
                       if (line.startsWith("# ")) {
-                        return <h1 key={i} className="text-2xl font-bold text-white mt-6 mb-3">{line.replace("# ", "")}</h1>;
+                        return <h1 key={i} className="text-2xl font-bold text-white mt-6 mb-3">{renderBoldText(line.replace("# ", ""))}</h1>;
                       }
                       if (line.startsWith("## ")) {
-                        return <h2 key={i} className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/5 pb-1">{line.replace("## ", "")}</h2>;
+                        return <h2 key={i} className="text-xl font-bold text-white mt-5 mb-2 border-b border-white/5 pb-1">{renderBoldText(line.replace("## ", ""))}</h2>;
                       }
                       if (line.startsWith("### ")) {
-                        return <h3 key={i} className="text-lg font-bold text-white mt-4 mb-2">{line.replace("### ", "")}</h3>;
+                        return <h3 key={i} className="text-lg font-bold text-white mt-4 mb-2">{renderBoldText(line.replace("### ", ""))}</h3>;
                       }
                       if (line.startsWith("- ") || line.startsWith("* ")) {
-                        return <li key={i} className="ml-4 list-disc text-slate-300 pl-1">{line.replace(/^[-*]\s+/, "")}</li>;
+                        return <li key={i} className="ml-4 list-disc text-slate-300 pl-1">{renderBoldText(line.replace(/^[-*]\s+/, ""))}</li>;
                       }
                       if (line.trim() === "") {
                         return <div key={i} className="h-2" />;
                       }
-                      return <p key={i} className="text-slate-300">{line}</p>;
+                      return <p key={i} className="text-slate-300">{renderBoldText(line)}</p>;
                     })}
                   </div>
                 </div>
