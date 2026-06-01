@@ -64,10 +64,10 @@ export async function recoverStuckEvents(): Promise<{
   const pendingRetryEvents = await prisma.webhookEvent.findMany({
     where: {
       status: "pending",
-      AND: [
-        { nextRetryAt: { not: null } },
-        { nextRetryAt: { lte: now } },
-      ],
+      nextRetryAt: {
+        lte: now,
+        not: null,
+      },
     },
     orderBy: { createdAt: "asc" },
     take: 10,

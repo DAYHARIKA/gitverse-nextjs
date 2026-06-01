@@ -244,6 +244,17 @@ export async function reviewPullRequest(params: {
     ? `\nCross-Repository Impact Risk: ${impactReport.risk}\nReason: ${impactReport.reason}\nPotentially Affected Downstream Repositories: ${impactReport.potentiallyAffectedRepositories.join(", ")}\n` 
     : "";
 
+  // Fetch active organizational policies for this repository
+  let policySection = "";
+  if (params.repositoryId) {
+    try {
+      const policies = await getActivePoliciesForRepository(params.repositoryId);
+      policySection = buildPolicyPromptSection(policies);
+    } catch (error) {
+      console.warn("[reviewPullRequest] Failed to fetch review policies:", error);
+    }
+  }
+
   const processChunk = async (chunkFiles: typeof prFiles, chunkIndex: number, totalChunks: number): Promise<PRReviewResponse | null> => {
     const { diff, stats } = buildDiffForPrompt(chunkFiles);
 
@@ -252,17 +263,6 @@ export async function reviewPullRequest(params: {
         throw new Error("PR diff is unavailable (no patch content returned).");
       }
       return null;
-    }
-
-    // Fetch active organizational policies for this repository
-    let policySection = "";
-    if (params.repositoryId) {
-      try {
-        const policies = await getActivePoliciesForRepository(params.repositoryId);
-        policySection = buildPolicyPromptSection(policies);
-      } catch (error) {
-        console.warn("[reviewPullRequest] Failed to fetch review policies:", error);
-      }
     }
 
     const chunkNotice = totalChunks > 1 ? `(Chunk ${chunkIndex} of ${totalChunks})` : "";

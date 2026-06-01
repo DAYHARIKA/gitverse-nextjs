@@ -25,6 +25,8 @@
       "@/lib/*": ["./lib/*"],
       "@/app/*": ["./app/*"],
       "@/types/*": ["./types/*"],
+      "@/services/security/*": ["./services/security/*"],
+      "@/middleware/*": ["./middleware/*"],
       "@/*": ["./src/*"]
     }
   },

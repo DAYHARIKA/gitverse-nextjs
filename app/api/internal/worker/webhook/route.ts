@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     return await handlePost(request);
   } finally {
     // Crucial: Drain the queue by picking up the next pending jobs
-    webhookQueue.triggerWorkers(baseUrl).catch(err => {
+    webhookQueue.triggerWorkers(baseUrl).catch((err: any) => {
       console.error("[Worker] Failed to trigger next jobs:", err);
     });
   }
@@ -399,10 +399,20 @@ async function handlePost(request: NextRequest) {
         error
       );
     }
+
+    const currentRetryCount = webhookEvent?.retryCount ?? 0;
+    const maxRetries = webhookEvent?.maxRetries ?? 3;
+    const shouldRetry = currentRetryCount < maxRetries;
+    const retryDelay = Math.pow(2, currentRetryCount) * 1000;
     
     await prisma.webhookEvent.update({
       where: { id: eventId },
-      data: { status: "failed", error: String(error?.message || error) },
+      data: {
+        status: shouldRetry ? "pending" : "failed",
+        error: String(error?.message || error),
+        retryCount: currentRetryCount + 1,
+        nextRetryAt: shouldRetry ? new Date(Date.now() + retryDelay) : null,
+      },
     });
 
     return NextResponse.json(
