@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyToken } from "./auth";
+import { verifyTokenWithUserValidation } from "./auth";
+import { getNextAuthSecret } from "./config/env";
 import type { JWTPayload } from "./auth";
 import prisma from "@/lib/prisma";
 import { getToken } from "next-auth/jwt";
+import { hashApiKey } from "@/lib/utils/api-key";
 
 export interface AuthenticatedRequest {
   user: JWTPayload;
 }
 
 /**
- * Resolves the authenticated user from either a JWT bearer token
- * or a NextAuth session cookie.
+ * Resolves the authenticated user from either a JWT bearer token,
+ * an API key, or a NextAuth session cookie.
  * Rejects tokens issued before the user's latest password change.
+ * Uses secure token validation with tokenVersion verification.
  */
 export async function getAuthUser(
   request: NextRequest
@@ -19,39 +22,67 @@ export async function getAuthUser(
   const authHeader = request.headers.get("authorization");
   let userPayload: JWTPayload | null = null;
 
-  // 1) Existing JWT auth (Authorization: Bearer ...)
+  // 1) Secure JWT auth (Authorization: Bearer ...)
+  // Uses verifyTokenWithUserValidation for proper tokenVersion checking
   if (authHeader && authHeader.startsWith("Bearer ")) {
     const token = authHeader.substring(7);
-    const payload = verifyToken(token);
+    
+    // Try API key lookup first (fast, no crypto overhead)
+    if (token.startsWith("gv_")) {
+      const hashed = hashApiKey(token);
+      try {
+        const apiKey = await prisma.apiKey.findUnique({ where: { hashedKey: hashed } });
+        if (apiKey && apiKey.expiresAt > new Date()) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: apiKey.userId },
+            select: { id: true, email: true, name: true, tokenVersion: true, lockedUntil: true },
+          });
+          if (dbUser && (!dbUser.lockedUntil || dbUser.lockedUntil <= new Date())) {
+            await prisma.apiKey.update({
+              where: { id: apiKey.id },
+              data: { lastUsedAt: new Date() },
+            });
+            userPayload = { userId: dbUser.id, email: dbUser.email, tokenVersion: dbUser.tokenVersion };
+          }
+        }
+      } catch {
+        // DB error — fall through to other auth methods
+      }
+    }
 
-    if (payload) {
-      const dbUser = await prisma.user.findUnique({
-        where: { id: payload.userId },
-        select: {
-          id: true,
-          passwordChangedAt: true,
-        },
-      });
+    // Try JWT token (existing behavior)
+    if (!userPayload) {
+      try {
+        const payload = await verifyTokenWithUserValidation(token);
+        
+        if (payload) {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: payload.userId },
+            select: {
+              id: true,
+              tokenVersion: true,
+              lockedUntil: true,
+            },
+          });
 
-      if (!dbUser) {
+          if (!dbUser) {
+            return null;
+          }
+
+          if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+            return null;
+          }
+
+          if (payload.tokenVersion !== dbUser.tokenVersion) {
+            return null;
+          }
+
+          userPayload = payload;
+        }
+      } catch (error) {
+        console.warn("[Auth] JWT validation error:", error);
         return null;
       }
-
-      const issuedAt =
-        typeof (payload as any).iat === "number"
-          ? (payload as any).iat
-          : null;
-
-      if (
-        dbUser.passwordChangedAt &&
-        (issuedAt === null ||
-          issuedAt * 1000 <=
-            dbUser.passwordChangedAt.getTime())
-      ) {
-        return null;
-      }
-
-      userPayload = payload;
     }
   }
 
@@ -60,7 +91,7 @@ export async function getAuthUser(
     try {
       const token = await getToken({
         req: request,
-        secret: process.env.NEXTAUTH_SECRET,
+        secret: getNextAuthSecret(),
       });
 
       if (token?.sub && token.email) {
@@ -76,10 +107,15 @@ export async function getAuthUser(
             id: true,
             passwordChangedAt: true,
             tokenVersion: true,
+            lockedUntil: true,
           },
         });
 
         if (!dbUser) {
+          return null;
+        }
+
+        if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
           return null;
         }
 
@@ -105,6 +141,13 @@ export async function getAuthUser(
           jwtTokenVersion != null &&
           jwtTokenVersion !== dbUser.tokenVersion
         ) {
+          try {
+            request.cookies.delete("next-auth.session-token");
+            request.cookies.delete("next-auth.csrf-token");
+            request.cookies.delete("next-auth.callback-url");
+          } catch {
+            // Best-effort cookie clearing
+          }
           return null;
         }
 
@@ -120,9 +163,9 @@ export async function getAuthUser(
 
   if (!userPayload) return null;
 
-  // 3) Verify user existence and token version
+  // Final verification: ensure user still exists
   try {
-    const dbUser = await prisma.user.findUnique({
+    const finalUser = await prisma.user.findUnique({
       where: { id: userPayload.userId },
       select: {
         id: true,
@@ -131,35 +174,12 @@ export async function getAuthUser(
       },
     });
 
-    if (!dbUser) {
+    if (!finalUser) {
       return null;
     }
 
-    if (dbUser.lockedUntil && dbUser.lockedUntil > new Date()) {
+    if (finalUser.lockedUntil && finalUser.lockedUntil > new Date()) {
       return null;
-    }
-
-    const isJwtAuth = !!(
-      authHeader &&
-      authHeader.startsWith("Bearer ")
-    );
-
-    // JWT-authenticated users must provide a valid tokenVersion.
-    // This allows logout/password-change invalidation to immediately
-    // revoke previously issued tokens.
-    if (isJwtAuth) {
-      // Reject legacy JWTs without tokenVersion
-      if (userPayload.tokenVersion == null) {
-        return null;
-      }
-
-      // Require exact token version match
-      if (
-        userPayload.tokenVersion !==
-        dbUser.tokenVersion
-      ) {
-        return null;
-      }
     }
   } catch (error) {
     console.error(
@@ -183,6 +203,29 @@ export async function requireAuth(
 
   if (!user) {
     throw new HttpError(401, "Unauthorized");
+  }
+
+  return user;
+}
+
+const ADMIN_EMAILS = process.env.ADMIN_EMAILS ? process.env.ADMIN_EMAILS.split(',').map(e => e.trim()) : [];
+
+/**
+ * Checks if the given user is an administrator.
+ */
+export function isAdmin(user: JWTPayload): boolean {
+  return ADMIN_EMAILS.includes(user.email);
+}
+
+/**
+ * Ensures the incoming request is authenticated AND the user is an admin.
+ * Throws an HttpError if authentication or authorization fails.
+ */
+export async function requireAdmin(request: NextRequest): Promise<JWTPayload> {
+  const user = await requireAuth(request);
+
+  if (!isAdmin(user)) {
+    throw new HttpError(403, "Forbidden: Admin access required");
   }
 
   return user;

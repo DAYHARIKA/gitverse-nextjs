@@ -1,8 +1,16 @@
 import { NextRequest } from "next/server";
 import prisma from "@/lib/prisma";
-const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000;
 let lastCleanupAt = 0;
-export type AttemptType = "LOGIN" | "SIGNUP" | "CHANGE_PASSWORD" | "DELETE_ACCOUNT";
+
+export type AttemptType =
+  | "LOGIN"
+  | "SIGNUP"
+  | "CHANGE_PASSWORD"
+  | "DELETE_ACCOUNT"
+  | "REPOSITORY_ANALYSIS"
+  | "ANALYSIS_RUNNER";
 
 const RETENTION_DAYS = 7;
 
@@ -33,7 +41,7 @@ async function maybeCleanupStaleAttempts() {
   try {
     await cleanupStaleAttempts();
   } catch (error) {
-    console.error("Background cleanup failed:", error);
+    console.error("Background stale attempt cleanup failed:", error);
   }
 }
 
@@ -58,8 +66,31 @@ export async function isRateLimited(
 
     return count >= maxAttempts;
   } catch (error) {
-    console.error("Rate limit check failed, allowing request:", error);
-    return false;
+    console.error(`Rate limit check failed for key=${key} type=${type}:`, error);
+    throw error;
+  }
+}
+
+export async function isAnalysisRunnerRateLimited(
+  workerId: string,
+): Promise<boolean> {
+  const maxJobsPerMinute = 10;
+  const windowMs = 60 * 1000;
+
+  try {
+    const since = new Date(Date.now() - windowMs);
+    const count = await prisma.loginAttempt.count({
+      where: {
+        key: `runner:${workerId}`,
+        type: "ANALYSIS_RUNNER",
+        createdAt: { gte: since },
+      },
+    });
+
+    return count >= maxJobsPerMinute;
+  } catch (error) {
+    console.error(`Analysis runner rate limit check failed for worker=${workerId}:`, error);
+    throw error;
   }
 }
 
@@ -80,8 +111,8 @@ export async function countAttempts(
       },
     });
   } catch (error) {
-    console.error("Rate limit count failed:", error);
-    return 0;
+    console.error(`Rate limit count failed for key=${key} type=${type}:`, error);
+    throw error;
   }
 }
 
@@ -103,7 +134,29 @@ export async function recordAttempt(params: {
       },
     });
   } catch (error) {
-    console.error("Failed to record rate limit attempt:", error);
+    console.error(`Failed to record rate limit attempt key=${params.key} type=${params.type}:`, error);
+    throw error;
+  }
+}
+
+export async function recordAnalysisRunnerAttempt(
+  workerId: string,
+  jobId: string,
+  success: boolean,
+): Promise<void> {
+  try {
+    await prisma.loginAttempt.create({
+      data: {
+        key: `runner:${workerId}`,
+        type: "ANALYSIS_RUNNER",
+        success,
+        email: null,
+        userId: null,
+      },
+    });
+  } catch (error) {
+    console.error(`Failed to record analysis runner attempt worker=${workerId} job=${jobId}:`, error);
+    throw error;
   }
 }
 
@@ -120,7 +173,7 @@ export async function clearFailedAttempts(
       },
     });
   } catch (error) {
-    console.error("Failed to clear rate limit attempts:", error);
+    console.error(`Failed to clear rate limit attempts key=${key} type=${type}:`, error);
   }
 }
 

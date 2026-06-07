@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import ReactMarkdown from "react-markdown";
@@ -62,38 +62,29 @@ export default function CompareRepositories() {
   const [isAiLoading, setIsAiLoading] = useState(false);
   const [hasCompared, setHasCompared] = useState(false);
 
-  useEffect(() => {
-    if (!isAuthLoading && !isAuthenticated) {
-      router.push("/login");
-      return;
-    }
-    fetchRepositories();
-  }, [isAuthLoading, isAuthenticated]);
-
-  const fetchRepositories = async () => {
+  const fetchRepositories = useCallback(async () => {
     try {
       setIsListLoading(true);
       const token = localStorage.getItem("gitverse_token");
       const response = await axios.get(buildApiUrl("/api/repositories?limit=100"), {
         headers: token ? { Authorization: `Bearer ${token}` } : {},
       });
-      const resData = response.data?.data?.repositories || response.data?.repositories || {};
-      const repos = Array.isArray(resData)
-        ? resData
-        : (Array.isArray(resData.data) ? resData.data : []);
+      const resData = response.data?.data?.repositories || response.data?.repositories || [];
+      const repos = Array.isArray(resData) ? resData : [];
       // Filter only analyzed/complete repositories
-      setRepoList(repos);
+      setRepoList(Array.isArray(repos) ? repos : []);
     } catch (error) {
       console.error("Failed to fetch repositories:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load repositories list",
-        variant: "destructive",
-      });
-    } finally {
-      setIsListLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!isAuthLoading && !isAuthenticated) {
+      router.push("/login");
+      return;
+    }
+    fetchRepositories();
+  }, [isAuthLoading, isAuthenticated, router, fetchRepositories]);
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {

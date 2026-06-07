@@ -2,9 +2,12 @@
 
 export const dynamic = "force-dynamic";
 
-import { useEffect, useState, useRef, useCallback } from "react";
-import { User, Lock, Shield, Trash2, AlertCircle, Save, Cpu } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
+import Image from "next/image";
+import { User, Lock, Shield, Trash2, AlertCircle, Sun, Moon, Cpu } from "lucide-react";
+import { Save } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useTheme } from "@/contexts/ThemeContext";
 import {
   Card,
   CardHeader,
@@ -15,19 +18,23 @@ import {
   Input,
   toast,
   EmptyState,
+  Modal,
 } from "@/components/ui";
-import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/contexts/AuthContext";
+import SettingsSkeleton from "@/components/ui/SettingsSkeleton";
 import { buildApiUrl } from "@/services/apiConfig";
 import axios from "axios";
 import { useAISettings, AIProviderType } from "@/hooks/useAISettings";
 
 export default function Settings() {
   const { user, logout, isLoading: authLoading } = useAuth();
+  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState("profile");
   const [isLoading, setIsLoading] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const didInitProfileForm = useRef(false);
@@ -333,6 +340,7 @@ export default function Settings() {
 
   const confirmDeleteAccount = async () => {
     if (isDeletingAccount) return;
+    if (deleteConfirmText !== "DELETE") return;
 
     setIsDeletingAccount(true);
     try {
@@ -349,22 +357,25 @@ export default function Settings() {
         description: "Your account has been deleted successfully.",
       });
 
-      window.location.href = "/signup";
+      window.location.href = "/account-deleted";
     } catch (error: any) {
       console.error("Error deleting account:", error);
       toast({
         title: "Error",
         description:
-          error.response?.data?.error || "Failed to delete account",
+          error.response?.data?.message || "Failed to delete account.",
         variant: "destructive",
       });
     } finally {
       setIsDeletingAccount(false);
+      setShowDeleteModal(false);
+      setDeleteConfirmText("");
     }
   };
 
   const tabs = [
     { id: "profile", label: "Profile", icon: User },
+    { id: "preferences", label: "Appearance", icon: Sun },
     { id: "security", label: "Security", icon: Shield },
     { id: "ai", label: "AI Settings", icon: Cpu },
     { id: "danger", label: "Danger Zone", icon: Trash2 },
@@ -446,11 +457,10 @@ export default function Settings() {
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${
-                        activeTab === tab.id
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-all text-left ${activeTab === tab.id
                           ? "bg-primary/10 text-primary font-medium"
                           : "text-muted-foreground hover:bg-accent hover:text-foreground"
-                      }`}
+                        }`}
                     >
                       <tab.icon className="h-5 w-5" />
                       <span>{tab.label}</span>
@@ -514,7 +524,7 @@ export default function Settings() {
                     {isGoogleLinked &&
                       !!initialEmailRef.current &&
                       email.trim().toLowerCase() !==
-                        initialEmailRef.current.toLowerCase() && (
+                      initialEmailRef.current.toLowerCase() && (
                         <div className="space-y-2">
                           <label
                             htmlFor="email-change-password"
@@ -544,15 +554,19 @@ export default function Settings() {
                       <div className="flex items-center gap-4">
                         <div className="h-16 w-16 rounded-full bg-gradient-primary flex items-center justify-center overflow-hidden">
                           {avatar ? (
-                            <img
+                            <Image
                               src={avatar}
                               alt={name}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-cover"
                             />
                           ) : user?.avatar ? (
-                            <img
+                            <Image
                               src={user.avatar}
                               alt={user.name}
+                              width={64}
+                              height={64}
                               className="w-full h-full object-cover"
                             />
                           ) : (
@@ -593,6 +607,58 @@ export default function Settings() {
                       </Button>
                     </div>
                   </form>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Appearance Tab */}
+            {activeTab === "preferences" && (
+              <Card className="glass">
+                <CardHeader>
+                  <CardTitle className="font-heading flex items-center gap-2">
+                    <Sun className="h-5 w-5" />
+                    Appearance Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Customize the theme of the application
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Theme Mode</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <button
+                        type="button"
+                        onClick={() => setTheme('light')}
+                        aria-pressed={theme === 'light'}
+                        aria-label="Use light mode"
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
+                          theme === 'light'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Sun className="h-8 w-8 mb-2" />
+                        <span className="font-semibold text-sm">Light Mode</span>
+                        <span className="text-xs text-muted-foreground mt-1">Sleek light workspace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme('dark')}
+                        aria-pressed={theme === 'dark'}
+                        aria-label="Use dark mode"
+                        className={`flex flex-col items-center justify-center p-6 rounded-xl border transition-all ${
+                          theme === 'dark'
+                            ? 'border-primary bg-primary/5 text-primary'
+                            : 'border-border bg-background hover:bg-accent text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        <Moon className="h-8 w-8 mb-2" />
+                        <span className="font-semibold text-sm">Dark Mode</span>
+                        <span className="text-xs text-muted-foreground mt-1">Reduce eye strain at night</span>
+                      </button>
+                    </div>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -770,6 +836,49 @@ export default function Settings() {
             )}
 
             {/* Danger Zone Tab */}
+            {/* Delete Account Confirmation Modal */}
+{showDeleteModal && (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="bg-background border border-border rounded-lg p-6 max-w-md w-full mx-4 space-y-4">
+      <h2 className="text-lg font-semibold text-destructive flex items-center gap-2">
+        <Trash2 className="h-5 w-5" />
+        Delete Account
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        This action is <strong>permanent</strong> and cannot be undone. All your repositories, analysis data, and integrations will be deleted.
+      </p>
+      <div className="space-y-2">
+        <label className="text-sm font-medium">
+          Type <strong>DELETE</strong> to confirm:
+        </label>
+        <Input
+          value={deleteConfirmText}
+          onChange={(e) => setDeleteConfirmText(e.target.value)}
+          placeholder="DELETE"
+          className="border-destructive/50"
+        />
+      </div>
+      <div className="flex gap-3 justify-end">
+        <Button
+          variant="outline"
+          onClick={() => {
+            setShowDeleteModal(false);
+            setDeleteConfirmText("");
+          }}
+        >
+          Cancel
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={handleDeleteAccount}
+          disabled={deleteConfirmText !== "DELETE" || isDeletingAccount}
+        >
+          {isDeletingAccount ? "Deleting..." : "Delete Account"}
+        </Button>
+      </div>
+    </div>
+  </div>
+)}
             {activeTab === "danger" && (
               <Card className="glass border-destructive/50">
                 <CardHeader>
@@ -790,7 +899,7 @@ export default function Settings() {
                     </p>
                     <Button
                       variant="destructive"
-                      onClick={handleDeleteAccount}
+                      onClick={() => setShowDeleteModal(true)}
                       disabled={isDeletingAccount}
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
@@ -803,47 +912,6 @@ export default function Settings() {
           </div>
         </div>
       </div>
-      {showDeleteModal && (
-        <div
-          className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-account-title"
-          onKeyDown={(e) => e.key === "Escape" && setShowDeleteModal(false)}
-          onClick={(e) => e.target === e.currentTarget && setShowDeleteModal(false)}
-        >
-          <Card className="w-full max-w-sm">
-            <CardHeader>
-              <CardTitle id="delete-account-title">Delete Account</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-muted-foreground mb-6">
-                This permanently deletes your account and all data. This cannot be undone.
-              </p>
-
-              <div className="flex gap-3 justify-end">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowDeleteModal(false)}
-                >
-                  Cancel
-                </Button>
-
-                <Button
-                  variant="destructive"
-                  onClick={() => {
-                    setShowDeleteModal(false);
-                    confirmDeleteAccount();
-                  }}
-                  disabled={isDeletingAccount}
-                >
-                  {isDeletingAccount ? "Deleting..." : "Delete Account"}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
     </DashboardLayout>
   );

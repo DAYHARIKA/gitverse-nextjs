@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
+import Image from "next/image";
 import {
   GitBranch,
   LayoutDashboard,
@@ -25,10 +26,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui";
+import { Button, ThemeToggle } from "@/components/ui";
 import { CommandPalette } from "@/components/ui/CommandPalette";
 import { toast } from "@/hooks/use-toast";
-import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -183,7 +183,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
               <Menu className="h-5 w-5" />
             </Button>
 
-            <div className="flex-1 flex items-center justify-end px-4 sm:px-6">
+            <div className="flex-1 flex items-center justify-end px-4 sm:px-6 gap-3">
               <Button
                 variant="outline"
                 className="hidden sm:flex relative h-9 w-full justify-start rounded-[0.5rem] bg-background/50 text-sm text-muted-foreground sm:pr-12 md:w-56 lg:w-64 border-border/50 hover:bg-accent/50"
@@ -206,10 +206,12 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({
                 <Button variant="ghost" className="gap-2">
                   <div className="h-8 w-8 rounded-full bg-gradient-primary flex items-center justify-center">
                     {user?.avatar ? (
-                      <img
+                      <Image
                         src={user.avatar}
                         alt={user.name}
-                        className="rounded-full"
+                        width={32}
+                        height={32}
+                        className="rounded-full h-full w-full object-cover"
                       />
                     ) : (
                       <User className="h-4 w-4 text-primary-foreground" />

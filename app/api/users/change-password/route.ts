@@ -1,28 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
-import { requireAuth, sanitizeError } from "@/lib/middleware";
+import { requireAuth, sanitizeError, isHttpError } from "@/lib/middleware";
+import { logAuditEvent } from "@/lib/auditLogger";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIp,
+} from "@/lib/rateLimiter";
 
-/**
- * Handles authenticated password changes and invalidates
- * existing sessions after a successful password update.
- */
 export async function POST(request: NextRequest) {
   try {
     const user = await requireAuth(request);
+    const ip = getClientIp(request);
+
+    const rlResult = await checkRateLimit({
+      endpoint: "users:change-password",
+      userId: user.userId,
+      ip,
+      tier: "free",
+    });
+
+    if (!rlResult.allowed) {
+      return rateLimitResponse(rlResult);
+    }
+
     const body = await request.json();
     const { currentPassword, newPassword } = body;
 
     if (!newPassword) {
       return NextResponse.json(
-        { message: "New password is required" },
+        { error: "New password is required" },
         { status: 400 }
       );
     }
 
     if (newPassword.length < 8) {
       return NextResponse.json(
-        { message: "Password must be at least 8 characters" },
+        { error: "Password must be at least 8 characters" },
         { status: 400 }
       );
     }
@@ -33,33 +48,40 @@ export async function POST(request: NextRequest) {
 
     if (!userDetails) {
       return NextResponse.json(
-        { message: "User not found" },
+        { error: "User not found" },
         { status: 404 }
       );
     }
 
     const passwordHash = userDetails.passwordHash;
 
-    // Existing password users must verify current password
-    if (passwordHash) {
-      if (!currentPassword) {
-        return NextResponse.json(
-          { message: "Current password is required" },
-          { status: 400 }
-        );
-      }
-
-      const isPasswordValid = await bcrypt.compare(
-        currentPassword,
-        passwordHash
+    if (!passwordHash) {
+      return NextResponse.json(
+        {
+          error:
+            "This account uses OAuth. Password management is handled by your OAuth provider.",
+        },
+        { status: 400 }
       );
+    }
 
-      if (!isPasswordValid) {
-        return NextResponse.json(
-          { message: "Current password is incorrect" },
-          { status: 401 }
-        );
-      }
+    if (!currentPassword) {
+      return NextResponse.json(
+        { error: "Current password is required" },
+        { status: 400 }
+      );
+    }
+
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      passwordHash
+    );
+
+    if (!isPasswordValid) {
+      return NextResponse.json(
+        { error: "Current password is incorrect" },
+        { status: 401 }
+      );
     }
 
     const hashedPassword = await bcrypt.hash(
@@ -87,6 +109,14 @@ export async function POST(request: NextRequest) {
       }),
     ]);
 
+    await logAuditEvent({
+      userId: user.userId,
+      action: "PASSWORD_CHANGED",
+      resource: "User",
+      details: { ip },
+      ipAddress: ip,
+    });
+
     return NextResponse.json({
       message: "Password changed successfully",
     });
@@ -96,8 +126,15 @@ export async function POST(request: NextRequest) {
       sanitizeError(error)
     );
 
+    if (isHttpError(error)) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.status }
+      );
+    }
+
     return NextResponse.json(
-      { message: "Failed to change password" },
+      { error: "Failed to change password" },
       { status: 500 }
     );
   }

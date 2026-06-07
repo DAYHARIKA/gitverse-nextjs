@@ -62,10 +62,8 @@ export function RecentReposList() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      const resData = response.data.data?.repositories || response.data.repositories || {};
-      const userRepos = Array.isArray(resData)
-        ? resData
-        : (Array.isArray(resData.data) ? resData.data : []);
+      const resData = response.data.data?.repositories || response.data.repositories || [];
+      const userRepos = Array.isArray(resData) ? resData : [];
       const existingRepo = userRepos.find(
         (r: any) => r.url.toLowerCase().trim() === repo.url.toLowerCase().trim()
       );
